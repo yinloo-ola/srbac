@@ -1,3 +1,3 @@
-module github.com/tianhai82/srbac
+module github.com/yinloo-ola/srbac
 
 go 1.20

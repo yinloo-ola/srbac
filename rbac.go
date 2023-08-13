@@ -1,74 +1,77 @@
 package srbac
 
-const (
-	IDENTITY        = "_identity"
-	PERMISSION      = "_permission"
-	ROLE            = "_role"
-	IDENTITY_ROLE   = "_identity_role"
-	ROLE_PERMISSION = "_role_permission"
+import (
+	"fmt"
+
+	"github.com/yinloo-ola/srbac/store"
 )
 
-type permission struct {
-	Permission string
-}
-type role struct {
-	Role string
-}
-type identity struct {
-	Userid   string
-	Username string
-}
-type identity_role struct {
-	IdentityId int64
-	RoleId     int64
-}
-type role_permission struct {
-	RoleId       int64
-	PermissionId int64
-}
-
 type Role struct {
-	Name        string       `json:"name"`
-	Permissions []Permission `json:"permissions"`
-	Id          int64        `json:"id"`
+	Name        string  `json:"name"`
+	Permissions []int64 `json:"permissions"`
+	Id          int64   `json:"id"`
 }
 type User struct {
-	Userid   string `json:"userid"`
-	Username string `json:"username"`
-	Roles    []Role `json:"roles"`
-	Id       int64  `json:"id"`
+	Id    int64   `json:"userid"`
+	Roles []int64 `json:"roles"`
 }
 type Permission struct {
 	Name string `json:"name"`
 	Id   int64  `json:"id"`
 }
 type Rbac struct {
-	store Store[Permission]
+	PermissionStore store.Store[Permission]
+	RoleStore       store.Store[Role]
+	UserStore       store.Store[User]
 }
 
-func New(store Store) *Rbac {
-	return &Rbac{store}
+func New(permissionStore store.Store[Permission], roleStore store.Store[Role], userStore store.Store[User]) *Rbac {
+	return &Rbac{
+		PermissionStore: permissionStore,
+		RoleStore:       roleStore,
+		UserStore:       userStore,
+	}
 }
 
-func (rbac *Rbac) HasPermission(userid string, permission string) bool {
-	users, err := rbac.GetUsers([]string{userid}, true)
-	if err != nil || users == nil || len(users) != 1 {
-		return false
-	}
-	var roleIds []int64 = make([]int64, len(users[0].Roles))
-	for i, role := range users[0].Roles {
-		roleIds[i] = role.Id
-	}
-	roles, err := rbac.GetRoles(roleIds, true)
+func (rbac *Rbac) HasPermission(userID int64, permissionID int64) (bool, error) {
+	user, err := rbac.UserStore.GetOne(userID)
 	if err != nil {
-		return false
+		return false, fmt.Errorf("rbac.UserStore.GetOne failed: %w", err)
+	}
+
+	roles, err := rbac.RoleStore.GetMulti(user.Roles)
+	if err != nil {
+		return false, fmt.Errorf("rbac.RoleStore.GetMulti failed: %w", err)
 	}
 	for _, r := range roles {
 		for _, p := range r.Permissions {
-			if p.Name == permission {
-				return true
+			if p == permissionID {
+				return true, nil
 			}
 		}
 	}
-	return false
+	return false, nil
+}
+
+func (rbac *Rbac) GetUserPermissions(userID int64) ([]Permission, error) {
+	user, err := rbac.UserStore.GetOne(userID)
+	if err != nil {
+		return nil, fmt.Errorf("rbac.UserStore.GetOne failed: %w", err)
+	}
+
+	roles, err := rbac.RoleStore.GetMulti(user.Roles)
+	if err != nil {
+		return nil, fmt.Errorf("rbac.RoleStore.GetMulti failed: %w", err)
+	}
+
+	permissionIDs := make([]int64, 0, len(roles)*3)
+	for _, r := range roles {
+		permissionIDs = append(permissionIDs, r.Permissions...)
+	}
+
+	permissions, err := rbac.PermissionStore.GetMulti(permissionIDs)
+	if err != nil {
+		return nil, fmt.Errorf("rbac.PermissionStore.GetMulti failed: %w", err)
+	}
+	return permissions, nil
 }
