@@ -7,17 +7,17 @@ import (
 )
 
 type Role struct {
-	Name        string  `json:"name"`
-	Permissions []int64 `json:"permissions"`
-	Id          int64   `json:"id"`
+	Name        string  `db:"name"`
+	Permissions []int64 `db:"permissions,json"`
+	Id          int64   `db:"id,pk"`
 }
 type User struct {
-	Id    int64   `json:"userid"`
-	Roles []int64 `json:"roles"`
+	Id    int64   `db:"id,pk"`
+	Roles []int64 `db:"roles,json"`
 }
 type Permission struct {
-	Name string `json:"name"`
-	Id   int64  `json:"id"`
+	Name string `db:"name"`
+	Id   int64  `db:"id,pk"`
 }
 type Rbac struct {
 	PermissionStore store.Store[Permission]
