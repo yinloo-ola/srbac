@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/yinloo-ola/srbac/store"
 	_ "modernc.org/sqlite"
 )
 
@@ -112,9 +113,15 @@ func (o *SqliteStore[K]) Update(id int64, obj K) error {
 		strings.Join(columns, ", "),
 		o.pk,
 	)
-	_, err := o.db.Exec(query, values...)
+	res, err := o.db.Exec(query, values...)
 	if err != nil {
 		return fmt.Errorf("update failed: %w", err)
+	}
+
+	if rowsAffected, err := res.RowsAffected(); err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	} else if rowsAffected == 0 {
+		return store.ErrNotFound
 	}
 	return nil
 }
@@ -133,7 +140,9 @@ func (o *SqliteStore[K]) GetOne(id int64) (K, error) {
 		return obj, fmt.Errorf("select failed: %w", err)
 	}
 	defer rows.Close()
+	rowCount := 0
 	for rows.Next() {
+		rowCount++
 		values := make([]interface{}, len(o.columns))
 		valuePtrs := make([]interface{}, len(o.columns))
 		for i := range o.columns {
@@ -172,6 +181,9 @@ func (o *SqliteStore[K]) GetOne(id int64) (K, error) {
 				}
 			}
 		}
+	}
+	if rowCount == 0 {
+		return obj, store.ErrNotFound
 	}
 	return obj, nil
 }

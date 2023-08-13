@@ -1,5 +1,7 @@
 package store
 
+import "errors"
+
 // Store is a generic interface to create, insert, update, retrieve, delete K.
 // Note that K is a struct that might contain an array of primitive values or even structs
 type Store[K any] interface {
@@ -10,3 +12,5 @@ type Store[K any] interface {
 	GetAll() ([]K, error)
 	DeleteMulti(ids []int64) error
 }
+
+var ErrNotFound error = errors.New("record not found")

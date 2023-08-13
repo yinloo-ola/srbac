@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/yinloo-ola/srbac/store"
 )
 
 type Role struct {
@@ -20,9 +22,9 @@ type Role struct {
 
 func TestNew(t *testing.T) {
 	path := "./rbac.db"
-	store, err := NewStore[Role](path)
+	roleStore, err := NewStore[Role](path)
 	if err != nil {
-		t.Fatalf("fail to create store %v", err)
+		t.Fatalf("fail to create roleStore %v", err)
 	}
 
 	t.Cleanup(func() {
@@ -35,7 +37,7 @@ func TestNew(t *testing.T) {
 	ctx := context.Background()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	err = store.db.PingContext(ctx)
+	err = roleStore.db.PingContext(ctx)
 	if err != nil {
 		t.Fatalf("ping fail %v", err)
 	}
@@ -46,7 +48,7 @@ func TestNew(t *testing.T) {
 		Ages:        []int16{34, 22},
 		Prices:      []float32{4.5, 3.2},
 	}
-	id, err := store.Insert(role)
+	id, err := roleStore.Insert(role)
 	if err != nil {
 		t.Fatalf("fail to insert: %v", err)
 	}
@@ -59,18 +61,28 @@ func TestNew(t *testing.T) {
 
 	role.Name = "super_admin"
 	role.Permissions = []int64{4, 5, 6}
-	err = store.Update(id, role)
+	err = roleStore.Update(id, role)
 	if err != nil {
 		t.Fatalf("fail to update %v", err)
 	}
 
-	roleOut, err := store.GetOne(id)
+	err = roleStore.Update(100, role)
+	if err != store.ErrNotFound {
+		t.Fatalf("fail to update %v", err)
+	}
+
+	roleOut, err := roleStore.GetOne(id)
 	if err != nil {
 		t.Fatalf("GetOne failed: %v", err)
 	}
 
 	if !reflect.DeepEqual(role, roleOut) {
 		t.Errorf("expected role:%#v. gotten:%#v", role, roleOut)
+	}
+
+	roleOut2, err := roleStore.GetOne(100)
+	if err != store.ErrNotFound {
+		t.Fatalf("expected error but gotten: %#v", roleOut2)
 	}
 
 }
