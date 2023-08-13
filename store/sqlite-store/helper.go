@@ -76,13 +76,28 @@ func getSQLiteType(field reflect.Type) string {
 	case reflect.Float32, reflect.Float64:
 		return "REAL"
 	case reflect.Struct:
-		return "TEXT"
+		panic("unsupported type")
 	case reflect.Array:
 		return "TEXT"
 	case reflect.Slice:
+		elem := field.Elem()
+		if elem.Kind() != reflect.String && !isPrimitive(elem.Kind()) {
+			panic("unsupported type")
+		}
 		return "TEXT"
 	default:
 		panic("unsupported type")
+	}
+}
+
+func isPrimitive(kind reflect.Kind) bool {
+	switch kind {
+	case reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
+		reflect.Float32, reflect.Float64, reflect.Complex64, reflect.Complex128:
+		return true
+	default:
+		return false
 	}
 }
 

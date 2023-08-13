@@ -4,14 +4,18 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 )
 
 type Role struct {
-	Name        string  `db:"name"`
-	Permissions []int64 `db:"permissions,json"`
-	Id          int64   `db:"id,pk"`
+	Name        string    `db:"name"`
+	Permissions []int64   `db:"permissions,json"`
+	Ages        []int16   `db:"ages,json"`
+	Alias       []string  `db:"alias,json"`
+	Prices      []float32 `db:"prices,json"`
+	Id          int64     `db:"id,pk"`
 }
 
 func TestNew(t *testing.T) {
@@ -38,12 +42,15 @@ func TestNew(t *testing.T) {
 	role := Role{
 		Name:        "admin",
 		Permissions: []int64{1, 2, 3},
-		Id:          5,
+		Alias:       []string{"a", "b"},
+		Ages:        []int16{34, 22},
+		Prices:      []float32{4.5, 3.2},
 	}
 	id, err := store.Insert(role)
 	if err != nil {
 		t.Fatalf("fail to insert: %v", err)
 	}
+	role.Id = id
 	if id != 1 {
 		t.Errorf("expect role id to be 1 but gotten %v", id)
 	}
@@ -56,4 +63,14 @@ func TestNew(t *testing.T) {
 	if err != nil {
 		t.Fatalf("fail to update %v", err)
 	}
+
+	roleOut, err := store.GetOne(id)
+	if err != nil {
+		t.Fatalf("GetOne failed: %v", err)
+	}
+
+	if !reflect.DeepEqual(role, roleOut) {
+		t.Errorf("expected role:%#v. gotten:%#v", role, roleOut)
+	}
+
 }
