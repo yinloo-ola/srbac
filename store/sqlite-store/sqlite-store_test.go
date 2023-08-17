@@ -13,6 +13,7 @@ import (
 
 type Role struct {
 	Name         string     `db:"name"`
+	IsHuman      bool       `db:"isHuman"`
 	Permissions  []int64    `db:"permissions,json"`
 	Ages         []int16    `db:"ages,json"`
 	Alias        []string   `db:"alias,json"`
@@ -53,6 +54,7 @@ func TestNew(t *testing.T) {
 	}
 	role := Role{
 		Name:         "admin",
+		IsHuman:      true,
 		Permissions:  []int64{1, 2, 3},
 		Alias:        []string{"a", "b"},
 		Ages:         []int16{34, 22},
@@ -85,10 +87,12 @@ func TestNew(t *testing.T) {
 		t.Fatalf("fail to update %v", err)
 	}
 
+	now := time.Now()
 	roleOut, err := roleStore.GetOne(id)
 	if err != nil {
 		t.Fatalf("GetOne failed: %v", err)
 	}
+	fmt.Println("duration [GetOne]", time.Since(now))
 
 	if !reflect.DeepEqual(role, roleOut) {
 		t.Errorf("expected role:%#v. gotten:%#v", role, roleOut)

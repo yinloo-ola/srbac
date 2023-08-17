@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/yinloo-ola/srbac/store"
 	_ "modernc.org/sqlite"
@@ -152,10 +153,14 @@ func (o *SqliteStore[K]) GetOne(id int64) (K, error) {
 			return obj, fmt.Errorf("fail to scan values: %w", err)
 		}
 
+		now := time.Now()
 		objValue := reflect.ValueOf(&obj)
+		fmt.Println("duration [reflect.ValueOf]:", time.Since(now))
 		elem := objValue.Elem()
 		for _, col := range o.columns {
+			now = time.Now()
 			field := elem.Field(col.Index)
+			fmt.Println("duration [elem.Field]:", time.Since(now))
 			if field.IsValid() && field.CanSet() {
 				v := values[col.Index]
 				if col.IsJSON {
@@ -165,7 +170,9 @@ func (o *SqliteStore[K]) GetOne(id int64) (K, error) {
 					}
 				} else {
 					if reflect.ValueOf(v).Type().AssignableTo(field.Type()) {
-						field.Set(reflect.ValueOf(v))
+						now = time.Now()
+						setReflectValue(v, col.SqLiteType, field)
+						fmt.Println("duration [setReflectValue]:", time.Since(now))
 					} else {
 						return obj, fmt.Errorf("fail to set value")
 					}

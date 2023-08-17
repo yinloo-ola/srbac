@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -13,8 +14,15 @@ type column struct {
 	Index      int
 	IsPK       bool
 	IsJSON     bool
-	SqLiteType string
+	SqLiteType sqliteType
 }
+type sqliteType string
+
+const (
+	sqliteTypeText sqliteType = "TEXT"
+	sqliteTypeInt  sqliteType = "INTEGER"
+	sqliteTypeReal sqliteType = "REAL"
+)
 
 func generateCreateTableSQL(tableName string, columns []column) string {
 	return fmt.Sprintf("CREATE TABLE if not exists %s (%s)", tableName, generateCreateColumnSQL(columns))
@@ -68,22 +76,27 @@ func getColumns(typ reflect.Type) []column {
 	return columns
 }
 
-func getSQLiteType(field reflect.Type) string {
+func getSQLiteType(field reflect.Type) sqliteType {
 	switch field.Kind() {
 	case reflect.Int, reflect.Int64, reflect.Uint, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uint8, reflect.Int16, reflect.Int32, reflect.Int8:
-		return "INTEGER"
+		return sqliteTypeInt
+	case reflect.Bool:
+		return sqliteTypeInt
 	case reflect.String:
-		return "TEXT"
+		return sqliteTypeText
 	case reflect.Float32, reflect.Float64:
-		return "REAL"
+		return sqliteTypeReal
 	case reflect.Struct:
-		return "TEXT"
+		return sqliteTypeText
 	case reflect.Pointer:
-		return "TEXT"
+		if isPrimitive(field.Elem().Kind()) {
+			panic("pointer to primitive is not supported")
+		}
+		return sqliteTypeText
 	case reflect.Array:
-		return "TEXT"
+		return sqliteTypeText
 	case reflect.Slice:
-		return "TEXT"
+		return sqliteTypeText
 	default:
 		panic("unsupported type")
 	}
@@ -130,16 +143,22 @@ func unmarshalJSONIntoValue(jsonStr string, value reflect.Value) error {
 		return json.Unmarshal([]byte(jsonStr), value.Addr().Interface())
 
 	case reflect.Slice:
+		now := time.Now()
 		elemKind := value.Type().Elem().Kind()
+		fmt.Println("duration [value.Type().Elem().Kind()]:", time.Since(now))
 
 		if elemKind == reflect.Ptr {
+			now = time.Now()
 			tempSlice := reflect.New(value.Type()).Elem()
+			fmt.Println("duration [reflect.New]:", time.Since(now))
 			err := json.Unmarshal([]byte(jsonStr), tempSlice.Addr().Interface())
 			if err != nil {
 				return err
 			}
 
+			now = time.Now()
 			value.Set(tempSlice)
+			fmt.Println("duration [value.Set]:", time.Since(now))
 
 			return nil
 		} else {
@@ -149,4 +168,15 @@ func unmarshalJSONIntoValue(jsonStr string, value reflect.Value) error {
 	default:
 		return fmt.Errorf("unsupported value kind: %s", value.Kind().String())
 	}
+}
+func setReflectValue(obj any, colType sqliteType, value reflect.Value) error {
+	switch colType {
+	case sqliteTypeText:
+		value.SetString(obj.(string))
+	case sqliteTypeInt:
+		value.SetInt(obj.(int64))
+	case sqliteTypeReal:
+		value.SetFloat(obj.(float64))
+	}
+	return fmt.Errorf("unsupported value kind: %s", colType)
 }
