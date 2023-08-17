@@ -12,12 +12,22 @@ import (
 )
 
 type Role struct {
-	Name        string    `db:"name"`
-	Permissions []int64   `db:"permissions,json"`
-	Ages        []int16   `db:"ages,json"`
-	Alias       []string  `db:"alias,json"`
-	Prices      []float32 `db:"prices,json"`
-	Id          int64     `db:"id,pk"`
+	Name         string     `db:"name"`
+	Permissions  []int64    `db:"permissions,json"`
+	Ages         []int16    `db:"ages,json"`
+	Alias        []string   `db:"alias,json"`
+	Prices       []float32  `db:"prices,json"`
+	Address      Address    `db:"address,json"`
+	AddressPtr   *Address   `db:"addressPtr,json"`
+	Addresses    []Address  `db:"addresses,json"`
+	AddressesPtr []*Address `db:"addressesPtr,json"`
+	Id           int64      `db:"id,pk"`
+}
+
+type Address struct {
+	Street string
+	City   string
+	Zip    []string
 }
 
 func TestNew(t *testing.T) {
@@ -42,11 +52,15 @@ func TestNew(t *testing.T) {
 		t.Fatalf("ping fail %v", err)
 	}
 	role := Role{
-		Name:        "admin",
-		Permissions: []int64{1, 2, 3},
-		Alias:       []string{"a", "b"},
-		Ages:        []int16{34, 22},
-		Prices:      []float32{4.5, 3.2},
+		Name:         "admin",
+		Permissions:  []int64{1, 2, 3},
+		Alias:        []string{"a", "b"},
+		Ages:         []int16{34, 22},
+		Prices:       []float32{4.5, 3.2},
+		Address:      Address{"street", "city", []string{"1", "2", "3"}},
+		AddressPtr:   &Address{"streetPtr", "cityPtr", []string{"4", "5", "6"}},
+		Addresses:    []Address{{"street1", "city1", []string{"7", "8", "9"}}, {"street2", "city2", []string{"10", "11", "12"}}},
+		AddressesPtr: []*Address{{"streetPtr1", "cityPtr1", []string{"13", "14", "15"}}, {"streetPtr2", "cityPtr2", []string{"16", "17", "18"}}},
 	}
 	id, err := roleStore.Insert(role)
 	if err != nil {

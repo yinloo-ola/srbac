@@ -1,6 +1,7 @@
 package sqlitestore
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -76,14 +77,12 @@ func getSQLiteType(field reflect.Type) string {
 	case reflect.Float32, reflect.Float64:
 		return "REAL"
 	case reflect.Struct:
-		panic("unsupported type")
+		return "TEXT"
+	case reflect.Pointer:
+		return "TEXT"
 	case reflect.Array:
 		return "TEXT"
 	case reflect.Slice:
-		elem := field.Elem()
-		if elem.Kind() != reflect.String && !isPrimitive(elem.Kind()) {
-			panic("unsupported type")
-		}
 		return "TEXT"
 	default:
 		panic("unsupported type")
@@ -112,4 +111,42 @@ func toSnakeCase(input string) string {
 	}
 
 	return string(result)
+}
+
+func unmarshalJSONIntoValue(jsonStr string, value reflect.Value) error {
+	if !value.CanAddr() {
+		return fmt.Errorf("value must be addressable")
+	}
+
+	switch value.Kind() {
+	case reflect.Ptr:
+		if value.IsNil() {
+			value.Set(reflect.New(value.Type().Elem()))
+		}
+
+		return json.Unmarshal([]byte(jsonStr), value.Interface())
+
+	case reflect.Struct:
+		return json.Unmarshal([]byte(jsonStr), value.Addr().Interface())
+
+	case reflect.Slice:
+		elemKind := value.Type().Elem().Kind()
+
+		if elemKind == reflect.Ptr {
+			tempSlice := reflect.New(value.Type()).Elem()
+			err := json.Unmarshal([]byte(jsonStr), tempSlice.Addr().Interface())
+			if err != nil {
+				return err
+			}
+
+			value.Set(tempSlice)
+
+			return nil
+		} else {
+			return json.Unmarshal([]byte(jsonStr), value.Addr().Interface())
+		}
+
+	default:
+		return fmt.Errorf("unsupported value kind: %s", value.Kind().String())
+	}
 }

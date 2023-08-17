@@ -126,7 +126,7 @@ func (o *SqliteStore[K]) Update(id int64, obj K) error {
 	return nil
 }
 func (o *SqliteStore[K]) GetMulti(ids []int64) ([]K, error) {
-	return nil, errors.ErrUnsupported
+	return nil, errors.New("not implemented yet")
 }
 func (o *SqliteStore[K]) GetOne(id int64) (K, error) {
 	var obj K
@@ -159,25 +159,16 @@ func (o *SqliteStore[K]) GetOne(id int64) (K, error) {
 			if field.IsValid() && field.CanSet() {
 				v := values[col.Index]
 				if col.IsJSON {
-					var v2 any
-					err = json.Unmarshal([]byte(v.(string)), &v2)
+					err = unmarshalJSONIntoValue(v.(string), field)
 					if err != nil {
-						return obj, fmt.Errorf("fail to unmarshal json text field: %w", err)
+						return obj, fmt.Errorf("fail to unmarshal json into field: %w", err)
 					}
-					v = v2
-				}
-				if reflect.ValueOf(v).Type().AssignableTo(field.Type()) {
-					field.Set(reflect.ValueOf(v))
-				} else if reflect.ValueOf(v).Kind() == reflect.Slice && field.Kind() == reflect.Slice {
-					sliceValue := reflect.MakeSlice(field.Type(), len(v.([]any)), len(v.([]any)))
-					for i, val := range v.([]any) {
-						elementValue := reflect.ValueOf(val)
-						if !elementValue.Type().ConvertibleTo(field.Type().Elem()) {
-							return obj, fmt.Errorf("fail to populate slice. Wrong type: %s", elementValue.Type())
-						}
-						sliceValue.Index(i).Set(elementValue.Convert(field.Type().Elem()))
+				} else {
+					if reflect.ValueOf(v).Type().AssignableTo(field.Type()) {
+						field.Set(reflect.ValueOf(v))
+					} else {
+						return obj, fmt.Errorf("fail to set value")
 					}
-					field.Set(sliceValue)
 				}
 			}
 		}
@@ -188,8 +179,8 @@ func (o *SqliteStore[K]) GetOne(id int64) (K, error) {
 	return obj, nil
 }
 func (o *SqliteStore[K]) GetAll() ([]K, error) {
-	return nil, errors.ErrUnsupported
+	return nil, errors.New("not implemented yet")
 }
 func (o *SqliteStore[K]) DeleteMulti(ids []int64) error {
-	return errors.ErrUnsupported
+	return errors.New("not implemented yet")
 }
