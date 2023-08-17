@@ -14,6 +14,7 @@ type column struct {
 	Index      int
 	IsPK       bool
 	IsJSON     bool
+	IsBool     bool
 	SqLiteType sqliteType
 }
 type sqliteType string
@@ -65,11 +66,17 @@ func getColumns(typ reflect.Type) []column {
 
 		sqlType := getSQLiteType(field.Type)
 
+		isBool := false
+		if field.Type.Kind() == reflect.Bool {
+			isBool = true
+		}
+
 		columns = append(columns, column{
 			Name:       name,
 			Index:      i,
 			IsPK:       isPK,
 			IsJSON:     IsJSON,
+			IsBool:     isBool,
 			SqLiteType: sqlType,
 		})
 	}
@@ -169,14 +176,20 @@ func unmarshalJSONIntoValue(jsonStr string, value reflect.Value) error {
 		return fmt.Errorf("unsupported value kind: %s", value.Kind().String())
 	}
 }
-func setReflectValue(obj any, colType sqliteType, value reflect.Value) error {
-	switch colType {
-	case sqliteTypeText:
-		value.SetString(obj.(string))
-	case sqliteTypeInt:
-		value.SetInt(obj.(int64))
-	case sqliteTypeReal:
-		value.SetFloat(obj.(float64))
-	}
-	return fmt.Errorf("unsupported value kind: %s", colType)
-}
+
+// func setReflectValue(obj any, colType sqliteType, isBool bool, value reflect.Value) error {
+// 	switch colType {
+// 	case sqliteTypeText:
+// 		value.SetString(obj.(string))
+// 	case sqliteTypeInt:
+// 		if isBool {
+// 			intVal := obj.(int64)
+// 			value.SetBool(intVal > 0)
+// 		} else {
+// 			value.SetInt(obj.(int64))
+// 		}
+// 	case sqliteTypeReal:
+// 		value.SetFloat(obj.(float64))
+// 	}
+// 	return fmt.Errorf("unsupported value kind: %s", colType)
+// }

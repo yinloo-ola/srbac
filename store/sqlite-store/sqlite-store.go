@@ -27,8 +27,7 @@ func NewStore[K any](path string) (*SqliteStore[K], error) {
 	}
 
 	var k K
-	value := reflect.ValueOf(k)
-	typ := value.Type()
+	typ := reflect.TypeOf(k)
 	tableName := toSnakeCase(typ.Name())
 	columns := getColumns(typ)
 
@@ -169,10 +168,14 @@ func (o *SqliteStore[K]) GetOne(id int64) (K, error) {
 						return obj, fmt.Errorf("fail to unmarshal json into field: %w", err)
 					}
 				} else {
-					if reflect.ValueOf(v).Type().AssignableTo(field.Type()) {
+					if reflect.TypeOf(v).AssignableTo(field.Type()) {
 						now = time.Now()
-						setReflectValue(v, col.SqLiteType, field)
-						fmt.Println("duration [setReflectValue]:", time.Since(now))
+						field.Set(reflect.ValueOf(v))
+						fmt.Println("duration [field.Set non bool]:", col.SqLiteType, time.Since(now))
+					} else if col.IsBool {
+						now = time.Now()
+						field.SetBool(v.(int64) > 0)
+						fmt.Println("duration [field.Set bool]:", col.SqLiteType, time.Since(now))
 					} else {
 						return obj, fmt.Errorf("fail to set value")
 					}
