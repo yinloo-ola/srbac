@@ -11,28 +11,8 @@ import (
 	"github.com/yinloo-ola/srbac/store"
 )
 
-type Role struct {
-	Name         string     `db:"name"`
-	IsHuman      bool       `db:"isHuman"`
-	Permissions  []int64    `db:"permissions,json"`
-	Ages         []int16    `db:"ages,json"`
-	Alias        []string   `db:"alias,json"`
-	Prices       []float32  `db:"prices,json"`
-	Address      Address    `db:"address,json"`
-	AddressPtr   *Address   `db:"addressPtr,json"`
-	Addresses    []Address  `db:"addresses,json"`
-	AddressesPtr []*Address `db:"addressesPtr,json"`
-	Id           int64      `db:"id,pk"`
-}
-
-type Address struct {
-	Street string
-	City   string
-	Zip    []string
-}
-
 func TestNew(t *testing.T) {
-	path := "./rbac.db"
+	path := "rbac.db"
 	roleStore, err := NewStore[Role](path)
 	if err != nil {
 		t.Fatalf("fail to create roleStore %v", err)
@@ -40,6 +20,14 @@ func TestNew(t *testing.T) {
 
 	t.Cleanup(func() {
 		errRemove := os.Remove(path)
+		if errRemove != nil {
+			t.Fatalf("fail to clean up rbac.db. please clean up manually")
+		}
+		errRemove = os.Remove(path + "-shm")
+		if errRemove != nil {
+			t.Fatalf("fail to clean up rbac.db. please clean up manually")
+		}
+		errRemove = os.Remove(path + "-wal")
 		if errRemove != nil {
 			t.Fatalf("fail to clean up rbac.db. please clean up manually")
 		}

@@ -1,11 +1,9 @@
 package sqlitestore
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
-	"time"
 	"unicode"
 )
 
@@ -13,8 +11,9 @@ type column struct {
 	Name       string
 	Index      int
 	IsPK       bool
-	IsJSON     bool
-	IsBool     bool
+	IsIdxAsc   bool
+	IsIdxDesc  bool
+	IsIdxUniq  bool
 	SqLiteType sqliteType
 }
 type sqliteType string
@@ -27,6 +26,24 @@ const (
 
 func generateCreateTableSQL(tableName string, columns []column) string {
 	return fmt.Sprintf("CREATE TABLE if not exists %s (%s)", tableName, generateCreateColumnSQL(columns))
+}
+
+func generateCreateIdxSQL(tableName string, columns []column) string {
+	queries := make([]string, 0, len(columns))
+	for _, col := range columns {
+		uniq := ""
+		if col.IsIdxUniq {
+			uniq = "UNIQUE "
+		}
+		if col.IsIdxAsc {
+			s := fmt.Sprintf("CREATE %sINDEX idx_%s ON %s (%s asc);", uniq, col.Name, tableName, col.Name)
+			queries = append(queries, s)
+		} else if col.IsIdxDesc {
+			s := fmt.Sprintf("CREATE %sINDEX idx_%s ON %s (%s desc);", uniq, col.Name, tableName, col.Name)
+			queries = append(queries, s)
+		}
+	}
+	return strings.Join(queries, " ")
 }
 
 func generateCreateColumnSQL(columns []column) string {
@@ -53,9 +70,17 @@ func getColumns(typ reflect.Type) []column {
 			isPK = true
 		}
 
-		IsJSON := false
-		if strings.Contains(tag, ",json") {
-			IsJSON = true
+		isIdxAsc := false
+		isIdxDesc := false
+		if strings.Contains(tag, ",idx_asc") {
+			isIdxAsc = true
+		} else if strings.Contains(tag, ",idx_desc") {
+			isIdxDesc = true
+		}
+
+		isUniqIdx := false
+		if strings.Contains(tag, ",uniq") {
+			isUniqIdx = true
 		}
 
 		name := field.Name
@@ -66,17 +91,13 @@ func getColumns(typ reflect.Type) []column {
 
 		sqlType := getSQLiteType(field.Type)
 
-		isBool := false
-		if field.Type.Kind() == reflect.Bool {
-			isBool = true
-		}
-
 		columns = append(columns, column{
 			Name:       name,
 			Index:      i,
 			IsPK:       isPK,
-			IsJSON:     IsJSON,
-			IsBool:     isBool,
+			IsIdxAsc:   isIdxAsc,
+			IsIdxDesc:  isIdxDesc,
+			IsIdxUniq:  isUniqIdx,
 			SqLiteType: sqlType,
 		})
 	}
@@ -132,64 +153,3 @@ func toSnakeCase(input string) string {
 
 	return string(result)
 }
-
-func unmarshalJSONIntoValue(jsonStr string, value reflect.Value) error {
-	if !value.CanAddr() {
-		return fmt.Errorf("value must be addressable")
-	}
-
-	switch value.Kind() {
-	case reflect.Ptr:
-		if value.IsNil() {
-			value.Set(reflect.New(value.Type().Elem()))
-		}
-
-		return json.Unmarshal([]byte(jsonStr), value.Interface())
-
-	case reflect.Struct:
-		return json.Unmarshal([]byte(jsonStr), value.Addr().Interface())
-
-	case reflect.Slice:
-		now := time.Now()
-		elemKind := value.Type().Elem().Kind()
-		fmt.Println("duration [value.Type().Elem().Kind()]:", time.Since(now))
-
-		if elemKind == reflect.Ptr {
-			now = time.Now()
-			tempSlice := reflect.New(value.Type()).Elem()
-			fmt.Println("duration [reflect.New]:", time.Since(now))
-			err := json.Unmarshal([]byte(jsonStr), tempSlice.Addr().Interface())
-			if err != nil {
-				return err
-			}
-
-			now = time.Now()
-			value.Set(tempSlice)
-			fmt.Println("duration [value.Set]:", time.Since(now))
-
-			return nil
-		} else {
-			return json.Unmarshal([]byte(jsonStr), value.Addr().Interface())
-		}
-
-	default:
-		return fmt.Errorf("unsupported value kind: %s", value.Kind().String())
-	}
-}
-
-// func setReflectValue(obj any, colType sqliteType, isBool bool, value reflect.Value) error {
-// 	switch colType {
-// 	case sqliteTypeText:
-// 		value.SetString(obj.(string))
-// 	case sqliteTypeInt:
-// 		if isBool {
-// 			intVal := obj.(int64)
-// 			value.SetBool(intVal > 0)
-// 		} else {
-// 			value.SetInt(obj.(int64))
-// 		}
-// 	case sqliteTypeReal:
-// 		value.SetFloat(obj.(float64))
-// 	}
-// 	return fmt.Errorf("unsupported value kind: %s", colType)
-// }
