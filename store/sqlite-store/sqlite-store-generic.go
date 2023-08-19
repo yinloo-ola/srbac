@@ -13,14 +13,15 @@ import (
 )
 
 type SQliteStore[O any, R store.Row[O]] struct {
-	db        *sql.DB
-	tablename string
-	pk        string
-	columns   []column
+	db         *sql.DB
+	tablename  string
+	pk         string
+	getOneStmt *sql.Stmt
+	columns    []column
 }
 
 func NewStore[O any, K store.Row[O]](path string) (*SQliteStore[O, K], error) {
-	db, err := sql.Open("sqlite", fmt.Sprintf("file:%s?cache=shared&mode=rwc&_journal_mode=WAL", path))
+	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, err
 	}
@@ -42,19 +43,29 @@ func NewStore[O any, K store.Row[O]](path string) (*SQliteStore[O, K], error) {
 		}
 	}
 
-	sql := generateCreateTableSQL(tableName, columns)
-	_, err = db.Exec(sql)
+	stmt := generateCreateTableSQL(tableName, columns)
+	_, err = db.Exec(stmt)
 	if err != nil {
 		return nil, err
 	}
 
-	sql = generateCreateIdxSQL(tableName, columns)
-	_, err = db.Exec(sql)
+	stmt = generateCreateIdxSQL(tableName, columns)
+	_, err = db.Exec(stmt)
 	if err != nil {
 		return nil, err
 	}
 
-	return &SQliteStore[O, K]{db: db, tablename: tableName, columns: columns, pk: pk}, nil
+	columnNames := make([]string, 0, len(columns))
+	for _, col := range columns {
+		columnNames = append(columnNames, col.Name)
+	}
+	query := fmt.Sprintf("SELECT %s from %s where %s=?", strings.Join(columnNames, ","), tableName, pk)
+	getOneStmt, err := db.Prepare(query)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SQliteStore[O, K]{db: db, tablename: tableName, columns: columns, pk: pk, getOneStmt: getOneStmt}, nil
 }
 
 func (o *SQliteStore[O, K]) Insert(obj O) (int64, error) {
@@ -130,18 +141,14 @@ func (o *SQliteStore[O, K]) GetMulti(ids []int64) ([]K, error) {
 func (o *SQliteStore[O, K]) GetOne(id int64) (O, error) {
 	var obj O
 	k := K(&obj)
-	columns := make([]string, 0, len(o.columns))
-	for _, col := range o.columns {
-		columns = append(columns, col.Name)
-	}
-	query := fmt.Sprintf("SELECT %s from %s where %s=?", strings.Join(columns, ","), o.tablename, o.pk)
-	row := o.db.QueryRow(query, id)
+
+	row := o.getOneStmt.QueryRow(id)
 	err := k.Scan(row)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return obj, store.ErrNotFound
 		}
-		return obj, fmt.Errorf("SQliteStore %s GetOne row.Scan error\n%s: %w", o.tablename, query, err)
+		return obj, fmt.Errorf("SQliteStore %s GetOne row.Scan error: %w", o.tablename, err)
 	}
 	return obj, nil
 }

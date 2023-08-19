@@ -68,6 +68,14 @@ func BenchmarkJsonGetOne(b *testing.B) {
 		if errRemove != nil {
 			b.Fatalf("fail to clean up rbac.db. please clean up manually")
 		}
+		errRemove = os.Remove(path + "-shm")
+		if errRemove != nil {
+			b.Fatalf("fail to clean up rbac.db. please clean up manually")
+		}
+		errRemove = os.Remove(path + "-wal")
+		if errRemove != nil {
+			b.Fatalf("fail to clean up rbac.db. please clean up manually")
+		}
 	})
 
 	ctx := context.Background()

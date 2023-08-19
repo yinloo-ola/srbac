@@ -1,8 +1,11 @@
 package sqlitestore
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
+	"errors"
+	"io"
 )
 
 type Role struct {
@@ -20,31 +23,49 @@ type Role struct {
 }
 
 func (o *Role) FieldsVals() []any {
-	permsStr, err := json.Marshal(o.Permissions)
+	out := make([]any, 0, 11)
+	out = append(out, o.Name, o.IsHuman)
+
+	buffer := bytes.NewBuffer(make([]byte, 0, 500))
+	enc := json.NewEncoder(buffer)
+
+	err := enc.Encode(o.Permissions)
 	panicErr(err)
 
-	agesStr, err := json.Marshal(o.Ages)
+	err = enc.Encode(o.Ages)
 	panicErr(err)
 
-	aliasStr, err := json.Marshal(o.Alias)
+	err = enc.Encode(o.Alias)
 	panicErr(err)
 
-	pricesStr, err := json.Marshal(o.Prices)
+	err = enc.Encode(o.Prices)
 	panicErr(err)
 
-	addressStr, err := json.Marshal(o.Address)
+	err = enc.Encode(o.Address)
 	panicErr(err)
 
-	addressPtrStr, err := json.Marshal(o.AddressPtr)
+	err = enc.Encode(o.AddressPtr)
 	panicErr(err)
 
-	addressesStr, err := json.Marshal(o.Addresses)
+	err = enc.Encode(o.Addresses)
 	panicErr(err)
 
-	addressesPtrStr, err := json.Marshal(o.AddressesPtr)
+	err = enc.Encode(o.AddressesPtr)
 	panicErr(err)
 
-	return []any{o.Name, o.IsHuman, string(permsStr), string(agesStr), string(aliasStr), string(pricesStr), string(addressStr), string(addressPtrStr), string(addressesStr), string(addressesPtrStr), o.Id}
+	for {
+		line, err := buffer.ReadString('\n')
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			panic("fail to read buffer: " + err.Error())
+		}
+		out = append(out, line)
+	}
+
+	out = append(out, o.Id)
+	return out
 }
 
 func panicErr(err error) {
@@ -62,28 +83,41 @@ func (o *Role) Scan(row *sql.Row) error {
 
 	o.IsHuman = isHuman > 0
 
-	err = json.Unmarshal(permsStr, &o.Permissions)
+	total := len(permsStr) + len(agesStr) + len(aliasStr) + len(pricesStr) + len(addressStr) + len(addressPtrStr) + len(addressesStr) + len(addressesPtrStr)
+	buffer := bytes.NewBuffer(make([]byte, 0, total))
+	buffer.Write(permsStr)
+	buffer.Write(agesStr)
+	buffer.Write(aliasStr)
+	buffer.Write(pricesStr)
+	buffer.Write(addressStr)
+	buffer.Write(addressPtrStr)
+	buffer.Write(addressesStr)
+	buffer.Write(addressesPtrStr)
+
+	decoder := json.NewDecoder(buffer)
+
+	err = decoder.Decode(&o.Permissions)
 	panicErr(err)
 
-	err = json.Unmarshal(agesStr, &o.Ages)
+	err = decoder.Decode(&o.Ages)
 	panicErr(err)
 
-	err = json.Unmarshal(aliasStr, &o.Alias)
+	err = decoder.Decode(&o.Alias)
 	panicErr(err)
 
-	err = json.Unmarshal(pricesStr, &o.Prices)
+	err = decoder.Decode(&o.Prices)
 	panicErr(err)
 
-	err = json.Unmarshal(addressStr, &o.Address)
+	err = decoder.Decode(&o.Address)
 	panicErr(err)
 
-	err = json.Unmarshal(addressPtrStr, &o.AddressPtr)
+	err = decoder.Decode(&o.AddressPtr)
 	panicErr(err)
 
-	err = json.Unmarshal(addressesStr, &o.Addresses)
+	err = decoder.Decode(&o.Addresses)
 	panicErr(err)
 
-	err = json.Unmarshal(addressesPtrStr, &o.AddressesPtr)
+	err = decoder.Decode(&o.AddressesPtr)
 	panicErr(err)
 
 	return nil
