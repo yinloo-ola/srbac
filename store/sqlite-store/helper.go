@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -65,6 +66,13 @@ func getColumns(typ reflect.Type) []column {
 		field := typ.Field(i)
 		tag := field.Tag.Get("db")
 
+		tagName, _, _ := strings.Cut(tag, ",")
+
+		name := field.Name
+		if len(tagName) > 0 {
+			name = tagName
+		}
+
 		isPK := false
 		if strings.Contains(tag, ",pk") {
 			isPK = true
@@ -81,12 +89,6 @@ func getColumns(typ reflect.Type) []column {
 		isUniqIdx := false
 		if strings.Contains(tag, ",uniq") {
 			isUniqIdx = true
-		}
-
-		name := field.Name
-		splitted := strings.Split(tag, ",")
-		if len(splitted) > 0 && len(splitted[0]) > 0 {
-			name = splitted[0]
 		}
 
 		sqlType := getSQLiteType(field.Type)
@@ -152,4 +154,21 @@ func toSnakeCase(input string) string {
 	}
 
 	return string(result)
+}
+
+// Column is a type constraint for types representing
+// a single database column.
+type Column interface {
+	~byte | ~int16 | ~int32 | ~int64 | ~float64 |
+		~string | ~bool | time.Time
+}
+
+// InArgs returns placeholders and args formatted for a WHERE IN clause.
+// Calling InArgs([]int{1,2,3}) will return ("?,?,?", []any{1,2,3}).
+func InArgs[T Column](tt []T) (string, []any) {
+	args := make([]any, len(tt))
+	for i, t := range tt {
+		args[i] = t
+	}
+	return strings.Repeat("?,", len(args)-1) + "?", args
 }

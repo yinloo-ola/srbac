@@ -3,29 +3,17 @@ package srbac
 import (
 	"fmt"
 
+	"github.com/yinloo-ola/srbac/models"
 	"github.com/yinloo-ola/srbac/store"
 )
 
-type Role struct {
-	Name        string  `db:"name"`
-	Permissions []int64 `db:"permissions,json"`
-	Id          int64   `db:"id,pk"`
-}
-type User struct {
-	Id    int64   `db:"id,pk"`
-	Roles []int64 `db:"roles,json"`
-}
-type Permission struct {
-	Name string `db:"name"`
-	Id   int64  `db:"id,pk"`
-}
 type Rbac struct {
-	PermissionStore store.Store[Permission]
-	RoleStore       store.Store[Role]
-	UserStore       store.Store[User]
+	PermissionStore store.Store[models.Permission]
+	RoleStore       store.Store[models.Role]
+	UserStore       store.Store[models.User]
 }
 
-func New(permissionStore store.Store[Permission], roleStore store.Store[Role], userStore store.Store[User]) *Rbac {
+func NewRbac(permissionStore store.Store[models.Permission], roleStore store.Store[models.Role], userStore store.Store[models.User]) *Rbac {
 	return &Rbac{
 		PermissionStore: permissionStore,
 		RoleStore:       roleStore,
@@ -33,13 +21,16 @@ func New(permissionStore store.Store[Permission], roleStore store.Store[Role], u
 	}
 }
 
-func (rbac *Rbac) HasPermission(userID int64, permissionID int64) (bool, error) {
-	user, err := rbac.UserStore.GetOne(userID)
+func (rbac *Rbac) HasPermission(userID string, permissionID int64) (bool, error) {
+	users, err := rbac.UserStore.FindField("user_id", userID)
 	if err != nil {
-		return false, fmt.Errorf("rbac.UserStore.GetOne failed: %w", err)
+		return false, fmt.Errorf("rbac.UserStore.FindField failed: %w", err)
+	}
+	if len(users) != 1 {
+		return false, store.ErrNotFound
 	}
 
-	roles, err := rbac.RoleStore.GetMulti(user.Roles)
+	roles, err := rbac.RoleStore.GetMulti(users[0].Roles)
 	if err != nil {
 		return false, fmt.Errorf("rbac.RoleStore.GetMulti failed: %w", err)
 	}
@@ -53,13 +44,16 @@ func (rbac *Rbac) HasPermission(userID int64, permissionID int64) (bool, error) 
 	return false, nil
 }
 
-func (rbac *Rbac) GetUserPermissions(userID int64) ([]Permission, error) {
-	user, err := rbac.UserStore.GetOne(userID)
+func (rbac *Rbac) GetUserPermissions(userID string) ([]models.Permission, error) {
+	users, err := rbac.UserStore.FindField("user_id", userID)
 	if err != nil {
-		return nil, fmt.Errorf("rbac.UserStore.GetOne failed: %w", err)
+		return nil, fmt.Errorf("rbac.UserStore.FindField failed: %w", err)
+	}
+	if len(users) != 1 {
+		return nil, store.ErrNotFound
 	}
 
-	roles, err := rbac.RoleStore.GetMulti(user.Roles)
+	roles, err := rbac.RoleStore.GetMulti(users[0].Roles)
 	if err != nil {
 		return nil, fmt.Errorf("rbac.RoleStore.GetMulti failed: %w", err)
 	}

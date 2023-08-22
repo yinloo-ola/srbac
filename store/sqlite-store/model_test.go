@@ -2,7 +2,6 @@ package sqlitestore
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -73,7 +72,7 @@ func panicErr(err error) {
 		panic(err)
 	}
 }
-func (o *Role) Scan(row *sql.Row) error {
+func (o *Role) ScanRow(row RowScanner) error {
 	isHuman := 0
 	var permsStr, agesStr, aliasStr, pricesStr, addressStr, addressPtrStr, addressesStr, addressesPtrStr []byte
 	err := row.Scan(&o.Name, &isHuman, &permsStr, &agesStr, &aliasStr, &pricesStr, &addressStr, &addressPtrStr, &addressesStr, &addressesPtrStr, &o.Id)
