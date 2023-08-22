@@ -8,12 +8,16 @@ import (
 )
 
 type Rbac struct {
-	PermissionStore store.Store[models.Permission]
-	RoleStore       store.Store[models.Role]
-	UserStore       store.Store[models.User]
+	PermissionStore store.Store[models.Permission, *models.Permission]
+	RoleStore       store.Store[models.Role, *models.Role]
+	UserStore       store.Store[models.User, *models.User]
 }
 
-func NewRbac(permissionStore store.Store[models.Permission], roleStore store.Store[models.Role], userStore store.Store[models.User]) *Rbac {
+func NewRbac(permissionStore store.Store[
+	models.Permission, *models.Permission],
+	roleStore store.Store[models.Role, *models.Role],
+	userStore store.Store[models.User, *models.User],
+) *Rbac {
 	return &Rbac{
 		PermissionStore: permissionStore,
 		RoleStore:       roleStore,
@@ -68,4 +72,20 @@ func (rbac *Rbac) GetUserPermissions(userID string) ([]models.Permission, error)
 		return nil, fmt.Errorf("rbac.PermissionStore.GetMulti failed: %w", err)
 	}
 	return permissions, nil
+}
+
+func (rbac *Rbac) Close() error {
+	err1 := rbac.PermissionStore.Close()
+	err2 := rbac.RoleStore.Close()
+	err3 := rbac.UserStore.Close()
+	if err1 != nil {
+		return err1
+	}
+	if err2 != nil {
+		return err2
+	}
+	if err3 != nil {
+		return err3
+	}
+	return nil
 }

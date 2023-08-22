@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/yinloo-ola/srbac/helper"
-	sqlitestore "github.com/yinloo-ola/srbac/store/sqlite-store"
+	"github.com/yinloo-ola/srbac/store"
 )
 
 type User struct {
@@ -19,7 +19,7 @@ func (o *User) FieldsVals() []any {
 	return []any{o.Id, o.UserID, roles}
 }
 
-func (o *User) ScanRow(row sqlitestore.RowScanner) error {
+func (o *User) ScanRow(row store.RowScanner) error {
 	var roles []byte
 	err := row.Scan(&o.Id, &o.UserID, &roles)
 	if err != nil {

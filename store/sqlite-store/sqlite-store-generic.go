@@ -12,20 +12,7 @@ import (
 	"github.com/yinloo-ola/srbac/store"
 )
 
-type RowScanner interface {
-	Scan(dest ...any) error
-}
-
-// Row is a type constraint for types representing
-// a single database row.
-type Row[T any] interface {
-	// FieldsVals returns all fields of a struct for use with row.Scan.
-	FieldsVals() []any
-	ScanRow(row RowScanner) error
-	*T
-}
-
-type SQliteStore[O any, R Row[O]] struct {
+type SQliteStore[T any, R store.Row[T]] struct {
 	db         *sql.DB
 	tablename  string
 	pk         string
@@ -36,7 +23,7 @@ type SQliteStore[O any, R Row[O]] struct {
 	columns    []column
 }
 
-func NewStore[O any, K Row[O]](path string) (*SQliteStore[O, K], error) {
+func NewStore[T any, R store.Row[T]](path string) (*SQliteStore[T, R], error) {
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, err
@@ -50,7 +37,7 @@ func NewStore[O any, K Row[O]](path string) (*SQliteStore[O, K], error) {
 		return nil, err
 	}
 
-	var obj O
+	var obj T
 	typ := reflect.TypeOf(obj)
 	tableName := toSnakeCase(typ.Name())
 	columns := getColumns(typ)
@@ -120,16 +107,16 @@ func NewStore[O any, K Row[O]](path string) (*SQliteStore[O, K], error) {
 		return nil, err
 	}
 
-	return &SQliteStore[O, K]{
+	return &SQliteStore[T, R]{
 		db: db, tablename: tableName, columns: columns, pk: pk,
 		getOneStmt: getOneStmt, insertStmt: insertStmt, updateStmt: updateStmt,
 		getAllStmt: getAllstmt,
 	}, nil
 }
 
-func (o *SQliteStore[O, K]) Insert(obj O) (int64, error) {
+func (o *SQliteStore[T, R]) Insert(obj T) (int64, error) {
 	values := make([]any, 0, len(o.columns))
-	k := K(&obj)
+	k := R(&obj)
 
 	fieldPtrs := k.FieldsVals()
 	for _, col := range o.columns {
@@ -152,9 +139,9 @@ func (o *SQliteStore[O, K]) Insert(obj O) (int64, error) {
 	return id, nil
 }
 
-func (o *SQliteStore[O, K]) Update(id int64, obj O) error {
+func (o *SQliteStore[T, R]) Update(id int64, obj T) error {
 	values := make([]any, 0, len(o.columns))
-	k := K(&obj)
+	k := R(&obj)
 	fieldPtrs := k.FieldsVals()
 	for _, col := range o.columns {
 		if col.IsPK {
@@ -178,7 +165,7 @@ func (o *SQliteStore[O, K]) Update(id int64, obj O) error {
 	return nil
 }
 
-func (o *SQliteStore[O, K]) GetMulti(ids []int64) ([]O, error) {
+func (o *SQliteStore[T, R]) GetMulti(ids []int64) ([]T, error) {
 	columnNames := make([]string, 0, len(o.columns))
 	for _, col := range o.columns {
 		columnNames = append(columnNames, col.Name)
@@ -196,10 +183,10 @@ func (o *SQliteStore[O, K]) GetMulti(ids []int64) ([]O, error) {
 	}
 	defer rows.Close()
 
-	objs := make([]O, 0, len(ids))
+	objs := make([]T, 0, len(ids))
 	for rows.Next() {
-		var obj O
-		k := K(&obj)
+		var obj T
+		k := R(&obj)
 		err = k.ScanRow(rows)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -212,9 +199,9 @@ func (o *SQliteStore[O, K]) GetMulti(ids []int64) ([]O, error) {
 	return objs, nil
 }
 
-func (o *SQliteStore[O, K]) GetOne(id int64) (O, error) {
-	var obj O
-	k := K(&obj)
+func (o *SQliteStore[T, R]) GetOne(id int64) (T, error) {
+	var obj T
+	k := R(&obj)
 
 	row := o.getOneStmt.QueryRow(id)
 	if row == nil {
@@ -230,7 +217,7 @@ func (o *SQliteStore[O, K]) GetOne(id int64) (O, error) {
 	}
 	return obj, nil
 }
-func (o *SQliteStore[O, K]) GetAll() ([]O, error) {
+func (o *SQliteStore[T, R]) GetAll() ([]T, error) {
 	rows, err := o.getAllStmt.Query()
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -240,10 +227,10 @@ func (o *SQliteStore[O, K]) GetAll() ([]O, error) {
 	}
 	defer rows.Close()
 
-	objs := make([]O, 0, 100)
+	objs := make([]T, 0, 100)
 	for rows.Next() {
-		var obj O
-		k := K(&obj)
+		var obj T
+		k := R(&obj)
 		err = k.ScanRow(rows)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -255,7 +242,7 @@ func (o *SQliteStore[O, K]) GetAll() ([]O, error) {
 	}
 	return objs, nil
 }
-func (o *SQliteStore[O, K]) DeleteMulti(ids []int64) error {
+func (o *SQliteStore[T, R]) DeleteMulti(ids []int64) error {
 	placeholder, args := InArgs(ids)
 	query := fmt.Sprintf("DELETE from %s where %s IN (%s)", o.tablename, o.pk, placeholder)
 	res, err := o.db.Exec(query, args...)
@@ -271,7 +258,7 @@ func (o *SQliteStore[O, K]) DeleteMulti(ids []int64) error {
 	}
 	return nil
 }
-func (o *SQliteStore[O, K]) FindField(field string, val any) ([]O, error) {
+func (o *SQliteStore[T, R]) FindField(field string, val any) ([]T, error) {
 	columnNames := make([]string, 0, len(o.columns))
 	for _, col := range o.columns {
 		columnNames = append(columnNames, col.Name)
@@ -286,10 +273,10 @@ func (o *SQliteStore[O, K]) FindField(field string, val any) ([]O, error) {
 	}
 	defer rows.Close()
 
-	var objs []O
+	var objs []T
 	for rows.Next() {
-		var obj O
-		k := K(&obj)
+		var obj T
+		k := R(&obj)
 		err = k.ScanRow(rows)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -300,4 +287,7 @@ func (o *SQliteStore[O, K]) FindField(field string, val any) ([]O, error) {
 		objs = append(objs, obj)
 	}
 	return objs, nil
+}
+func (o *SQliteStore[T, R]) Close() error {
+	return o.db.Close()
 }

@@ -37,10 +37,10 @@ func generateCreateIdxSQL(tableName string, columns []column) string {
 			uniq = "UNIQUE "
 		}
 		if col.IsIdxAsc {
-			s := fmt.Sprintf("CREATE %sINDEX idx_%s ON %s (%s asc);", uniq, col.Name, tableName, col.Name)
+			s := fmt.Sprintf("CREATE %sINDEX IF NOT EXISTS idx_%s ON %s (%s asc);", uniq, col.Name, tableName, col.Name)
 			queries = append(queries, s)
 		} else if col.IsIdxDesc {
-			s := fmt.Sprintf("CREATE %sINDEX idx_%s ON %s (%s desc);", uniq, col.Name, tableName, col.Name)
+			s := fmt.Sprintf("CREATE %sINDEX IF NOT EXISTS idx_%s ON %s (%s desc);", uniq, col.Name, tableName, col.Name)
 			queries = append(queries, s)
 		}
 	}

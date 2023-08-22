@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+
+	"github.com/yinloo-ola/srbac/store"
 )
 
 type Role struct {
@@ -72,7 +74,7 @@ func panicErr(err error) {
 		panic(err)
 	}
 }
-func (o *Role) ScanRow(row RowScanner) error {
+func (o *Role) ScanRow(row store.RowScanner) error {
 	isHuman := 0
 	var permsStr, agesStr, aliasStr, pricesStr, addressStr, addressPtrStr, addressesStr, addressesPtrStr []byte
 	err := row.Scan(&o.Name, &isHuman, &permsStr, &agesStr, &aliasStr, &pricesStr, &addressStr, &addressPtrStr, &addressesStr, &addressesPtrStr, &o.Id)
