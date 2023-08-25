@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 
 	_ "modernc.org/sqlite"
 
@@ -21,6 +22,7 @@ type SQliteStore[T any, R store.Row[T]] struct {
 	updateStmt *sql.Stmt
 	getAllStmt *sql.Stmt
 	columns    []column
+	sync.RWMutex
 }
 
 func NewStore[T any, R store.Row[T]](path string) (*SQliteStore[T, R], error) {
@@ -115,6 +117,8 @@ func NewStore[T any, R store.Row[T]](path string) (*SQliteStore[T, R], error) {
 }
 
 func (o *SQliteStore[T, R]) Insert(obj T) (int64, error) {
+	o.Lock()
+	defer o.Unlock()
 	values := make([]any, 0, len(o.columns))
 	k := R(&obj)
 
@@ -140,6 +144,8 @@ func (o *SQliteStore[T, R]) Insert(obj T) (int64, error) {
 }
 
 func (o *SQliteStore[T, R]) Update(id int64, obj T) error {
+	o.Lock()
+	defer o.Unlock()
 	values := make([]any, 0, len(o.columns))
 	k := R(&obj)
 	fieldPtrs := k.FieldsVals()
@@ -166,6 +172,8 @@ func (o *SQliteStore[T, R]) Update(id int64, obj T) error {
 }
 
 func (o *SQliteStore[T, R]) GetMulti(ids []int64) ([]T, error) {
+	o.RLock()
+	defer o.RUnlock()
 	columnNames := make([]string, 0, len(o.columns))
 	for _, col := range o.columns {
 		columnNames = append(columnNames, col.Name)
@@ -200,6 +208,8 @@ func (o *SQliteStore[T, R]) GetMulti(ids []int64) ([]T, error) {
 }
 
 func (o *SQliteStore[T, R]) GetOne(id int64) (T, error) {
+	o.RLock()
+	defer o.RUnlock()
 	var obj T
 	k := R(&obj)
 
@@ -218,6 +228,8 @@ func (o *SQliteStore[T, R]) GetOne(id int64) (T, error) {
 	return obj, nil
 }
 func (o *SQliteStore[T, R]) GetAll() ([]T, error) {
+	o.RLock()
+	defer o.RUnlock()
 	rows, err := o.getAllStmt.Query()
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -243,6 +255,8 @@ func (o *SQliteStore[T, R]) GetAll() ([]T, error) {
 	return objs, nil
 }
 func (o *SQliteStore[T, R]) DeleteMulti(ids []int64) error {
+	o.Lock()
+	defer o.Unlock()
 	placeholder, args := InArgs(ids)
 	query := fmt.Sprintf("DELETE from %s where %s IN (%s)", o.tablename, o.pk, placeholder)
 	res, err := o.db.Exec(query, args...)
@@ -259,6 +273,8 @@ func (o *SQliteStore[T, R]) DeleteMulti(ids []int64) error {
 	return nil
 }
 func (o *SQliteStore[T, R]) FindField(field string, val any) ([]T, error) {
+	o.RLock()
+	defer o.RUnlock()
 	columnNames := make([]string, 0, len(o.columns))
 	for _, col := range o.columns {
 		columnNames = append(columnNames, col.Name)
