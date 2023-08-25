@@ -26,7 +26,9 @@ func NewRbac(permissionStore store.Store[
 }
 
 func (rbac *Rbac) HasPermission(userID string, permissionID int64) (bool, error) {
-	users, err := rbac.UserStore.FindField("user_id", userID)
+	users, err := rbac.UserStore.FindWhere(&store.WhereCond{
+		Field: "user_id", Val: userID, Op: store.OpEqual,
+	})
 	if err != nil {
 		return false, fmt.Errorf("rbac.UserStore.FindField failed: %w", err)
 	}
@@ -49,7 +51,9 @@ func (rbac *Rbac) HasPermission(userID string, permissionID int64) (bool, error)
 }
 
 func (rbac *Rbac) GetUserPermissions(userID string) ([]models.Permission, error) {
-	users, err := rbac.UserStore.FindField("user_id", userID)
+	users, err := rbac.UserStore.FindWhere(&store.WhereCond{
+		Field: "user_id", Val: userID, Op: store.OpEqual,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("rbac.UserStore.FindField failed: %w", err)
 	}

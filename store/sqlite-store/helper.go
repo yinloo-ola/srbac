@@ -167,8 +167,10 @@ type Column interface {
 // Calling InArgs([]int{1,2,3}) will return ("?,?,?", []any{1,2,3}).
 func InArgs[T Column](tt []T) (string, []any) {
 	args := make([]any, len(tt))
+	qnMarks := make([]string, 0, len(tt))
 	for i, t := range tt {
 		args[i] = t
+		qnMarks = append(qnMarks, "?")
 	}
-	return strings.Repeat("?,", len(args)-1) + "?", args
+	return strings.Join(qnMarks, ","), args
 }

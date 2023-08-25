@@ -227,33 +227,7 @@ func (o *SQliteStore[T, R]) GetOne(id int64) (T, error) {
 	}
 	return obj, nil
 }
-func (o *SQliteStore[T, R]) GetAll() ([]T, error) {
-	o.RLock()
-	defer o.RUnlock()
-	rows, err := o.getAllStmt.Query()
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, store.ErrNotFound
-		}
-		return nil, fmt.Errorf("%s GetMulti Query error: %w", o.tablename, err)
-	}
-	defer rows.Close()
 
-	objs := make([]T, 0, 100)
-	for rows.Next() {
-		var obj T
-		k := R(&obj)
-		err = k.ScanRow(rows)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, store.ErrNotFound
-			}
-			return nil, fmt.Errorf("%s GetMulti row.Scan error: %w", o.tablename, err)
-		}
-		objs = append(objs, obj)
-	}
-	return objs, nil
-}
 func (o *SQliteStore[T, R]) DeleteMulti(ids []int64) error {
 	o.Lock()
 	defer o.Unlock()
@@ -272,15 +246,27 @@ func (o *SQliteStore[T, R]) DeleteMulti(ids []int64) error {
 	}
 	return nil
 }
-func (o *SQliteStore[T, R]) FindField(field string, val any) ([]T, error) {
+
+func (o *SQliteStore[T, R]) FindWhere(conds ...store.Cond) ([]T, error) {
 	o.RLock()
 	defer o.RUnlock()
 	columnNames := make([]string, 0, len(o.columns))
 	for _, col := range o.columns {
 		columnNames = append(columnNames, col.Name)
 	}
-	findQuery := fmt.Sprintf("SELECT %s from %s where %s=?", strings.Join(columnNames, ","), o.tablename, field)
-	rows, err := o.db.Query(findQuery, val)
+	whereStmt := ""
+	stmts := make([]string, 0, len(conds))
+	args := make([]any, 0, len(conds))
+	for _, cond := range conds {
+		s, arg := cond.GetWhereQueryWithArgs()
+		stmts = append(stmts, s)
+		args = append(args, arg...)
+	}
+	if len(stmts) > 0 {
+		whereStmt = " where " + strings.Join(stmts, " and ")
+	}
+	findQuery := fmt.Sprintf("SELECT %s from %s%s", strings.Join(columnNames, ","), o.tablename, whereStmt)
+	rows, err := o.db.Query(findQuery, args...)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, store.ErrNotFound
@@ -304,6 +290,7 @@ func (o *SQliteStore[T, R]) FindField(field string, val any) ([]T, error) {
 	}
 	return objs, nil
 }
+
 func (o *SQliteStore[T, R]) Close() error {
 	return o.db.Close()
 }

@@ -66,7 +66,7 @@ func TestParallelInsert(t *testing.T) {
 	wg.Wait()
 	close(permChan)
 
-	perms, err := rbac.PermissionStore.GetAll()
+	perms, err := rbac.PermissionStore.FindWhere()
 	helper.PanicErr(err)
 	assert.Len(perms, 100)
 	assert.ElementsMatch(permsIn, perms)

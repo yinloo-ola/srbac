@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/yinloo-ola/srbac/store"
 )
 
@@ -153,7 +154,22 @@ func TestNew(t *testing.T) {
 	}
 
 	now = time.Now()
-	rolesOutAll, err := roleStore.GetAll()
+	rolesFindBoth, err := roleStore.FindWhere(&store.WhereCond{
+		Field: "name",
+		Val:   []any{"referee", "super_admin", "guli"},
+		Op:    store.OpIn,
+	})
+	if err != nil {
+		t.Fatalf("roleStore.FindField failed %s", err)
+	}
+	if len(rolesFindBoth) != 2 {
+		t.Fatalf("roleStore.FindField should return nothing %s", err)
+	}
+	fmt.Printf("FindField duration: %s\n", time.Since(now))
+	assert.ElementsMatch(t, rolesFindBoth, []Role{role2, role})
+
+	now = time.Now()
+	rolesOutAll, err := roleStore.FindWhere()
 	if err != nil {
 		t.Fatalf("GetAll failed: %v", err)
 	}
@@ -185,7 +201,7 @@ func TestNew(t *testing.T) {
 	}
 	fmt.Printf("DeleteMulti duration: %s\n", time.Since(now))
 
-	rolesOutAll2, err := roleStore.GetAll()
+	rolesOutAll2, err := roleStore.FindWhere()
 	if err != nil {
 		t.Fatalf("roleStore.GetAll failed %s", err)
 	}
@@ -197,7 +213,11 @@ func TestNew(t *testing.T) {
 	}
 
 	now = time.Now()
-	rolesFind, err := roleStore.FindField("name", "super_admin")
+	rolesFind, err := roleStore.FindWhere(&store.WhereCond{
+		Field: "name",
+		Val:   "super_admin",
+		Op:    store.OpEqual,
+	})
 	if err != nil {
 		t.Fatalf("roleStore.FindField failed %s", err)
 	}
@@ -210,14 +230,17 @@ func TestNew(t *testing.T) {
 	}
 
 	now = time.Now()
-	rolesFind2, err := roleStore.FindField("name", "admin")
+	rolesFind2, err := roleStore.FindWhere(&store.WhereCond{
+		Field: "name",
+		Val:   "admin",
+		Op:    store.OpEqual,
+	})
 	if err != nil {
 		t.Fatalf("roleStore.FindField failed %s", err)
 	}
 	if len(rolesFind2) != 0 {
 		t.Fatalf("roleStore.FindField should return nothing %s", err)
 	}
-
 	fmt.Printf("FindField duration: %s\n", time.Since(now))
 
 	_, err = roleStore.Insert(Role{
