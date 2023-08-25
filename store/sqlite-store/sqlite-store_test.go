@@ -154,23 +154,26 @@ func TestNew(t *testing.T) {
 	}
 
 	now = time.Now()
-	rolesFindBoth, err := roleStore.FindWhere(&store.WhereCond{
-		Field: "name",
-		Val:   []any{"referee", "super_admin", "guli"},
-		Op:    store.OpIn,
-	}, &store.WhereCond{
-		Field: "isHuman",
-		Val:   true,
-		Op:    store.OpEqual,
-	})
+	rolesFindBoth, err := roleStore.FindWhere(
+		&store.WhereCond{
+			Field: "name",
+			Val:   []any{"referee", "guli"},
+			Op:    store.OpIn,
+		},
+		store.QueryJoinerOr,
+		&store.WhereCond{
+			Field: "isHuman",
+			Val:   true,
+			Op:    store.OpEqual,
+		})
 	if err != nil {
 		t.Fatalf("roleStore.FindField failed %s", err)
 	}
-	if len(rolesFindBoth) != 1 {
-		t.Fatalf("roleStore.FindField should return nothing %s", err)
+	if len(rolesFindBoth) != 2 {
+		t.Fatalf("roleStore.FindField should return 2 roles %s", err)
 	}
 	fmt.Printf("FindField duration: %s\n", time.Since(now))
-	assert.ElementsMatch(t, rolesFindBoth, []Role{role})
+	assert.ElementsMatch(t, rolesFindBoth, []Role{role, role2})
 
 	now = time.Now()
 	rolesOutAll, err := roleStore.FindWhere()

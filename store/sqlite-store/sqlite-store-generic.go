@@ -258,12 +258,12 @@ func (o *SQliteStore[T, R]) FindWhere(conds ...store.Cond) ([]T, error) {
 	stmts := make([]string, 0, len(conds))
 	args := make([]any, 0, len(conds))
 	for _, cond := range conds {
-		s, arg := cond.GetWhereQueryWithArgs()
+		s, arg := cond.GetQueryWithArgs()
 		stmts = append(stmts, s)
 		args = append(args, arg...)
 	}
 	if len(stmts) > 0 {
-		whereStmt = " where " + strings.Join(stmts, " and ")
+		whereStmt = " where " + strings.Join(stmts, " ")
 	}
 	findQuery := fmt.Sprintf("SELECT %s from %s%s", strings.Join(columnNames, ","), o.tablename, whereStmt)
 	rows, err := o.db.Query(findQuery, args...)

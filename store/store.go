@@ -35,7 +35,16 @@ const OpLte op = "<="
 const OpLt op = "<"
 const OpIn op = "in"
 
-func (o *WhereCond) GetWhereQueryWithArgs() (string, []any) {
+type QueryJoiner string
+
+const QueryJoinerAnd QueryJoiner = "and"
+const QueryJoinerOr QueryJoiner = "or"
+
+func (o QueryJoiner) GetQueryWithArgs() (string, []any) {
+	return string(o), []any{}
+}
+
+func (o WhereCond) GetQueryWithArgs() (string, []any) {
 	switch o.Op {
 	case OpIn:
 		vals, ok := o.Val.([]any)
@@ -53,7 +62,7 @@ func (o *WhereCond) GetWhereQueryWithArgs() (string, []any) {
 }
 
 type Cond interface {
-	GetWhereQueryWithArgs() (string, []any)
+	GetQueryWithArgs() (string, []any)
 }
 
 // Store is a generic interface to create, insert, update, retrieve, delete O.
@@ -63,6 +72,7 @@ type Store[T any, R Row[T]] interface {
 	Update(id int64, obj T) error
 	GetMulti(ids []int64) ([]T, error)
 	GetOne(id int64) (T, error)
+	// FindWhere WhereConds must be either empty or joined by QueryJoiners
 	FindWhere(...Cond) ([]T, error)
 	DeleteMulti(ids []int64) error
 	Close() error
